@@ -1,17 +1,37 @@
 // ==UserScript==
-// @name        test
+// @name        选译替换器TransReplace
 // @namespace   vurses
 // @license     Mit
 // @author      layenh
 // @match       http://127.0.0.1:5500/test.html
+// @match       https://fanyi.sogou.com/*
 // @grant       GM.xmlhttpRequest
 // @grant       GM_xmlhttpRequest
+// @grant       GM.getValue
+// @grant       GM_getValue
+// @grant       GM.setValue
+// @grant       GM_setValue
 // @connect     fanyi.sogou.com
 // @version     1.0
 // @require     https://update.greasyfork.org/scripts/533087/1572495/WbiSign.js
-// @description 2025/5/4 15:54:11
+// @description 翻译选中的文本并替换
 // ==/UserScript==
 
+// 获取cookie和secretCode
+let sogouCookie = GM_getValue("sogouCookie", "");
+let secretCode = GM_getValue("secretCode", "");
+if (location.href.includes("fanyi.sogou.com")) {
+  sogouCookie = document.cookie;
+  GM_setValue("sogouCookie", sogouCookie);
+  window.addEventListener("load", () => {
+    secretCode = unsafeWindow.__INITIAL_STATE__.common.CONFIG.secretCode;
+    GM_setValue("secretCode", secretCode);
+  });
+}
+// 注入语言菜单
+unsafeWindow.addEventListener("load", () => {
+  document.body.appendChild(createLangSwitcher(GM_setValue, GM_getValue));
+});
 // uuid生成
 function uuidGen() {
   let t,
@@ -26,34 +46,13 @@ function uuidGen() {
   }
   return r;
 }
-// 初始语言类型，可以是auto
-const from = "auto";
-// 目标语言类型
-const to = "en";
-// 初始语言内容
-const text = "hello";
-// 定时去搜狗翻译获取;
-const secretCode = 109984457;
-const keyS = SparkMD5.hash("".concat(from).concat(to).concat(text).concat(secretCode));
-const uuid = uuidGen();
-const data = {
-  client: "pc",
-  exchange: false,
-  fr: "browser_pc",
-  from: from,
-  needQc: 1,
-  s: keyS,
-  text: text,
-  to: to,
-  uuid: uuid,
-};
 // 简易封装xhr
-const gm_xhr = function () {
+const gm_xhr = function (data) {
   return new Promise((resolve, reject) => {
     GM_xmlhttpRequest({
       method: "POST",
       url: "https://fanyi.sogou.com/api/transpc/text/result",
-      data: JSON.stringify(body),
+      data: JSON.stringify(data),
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json, text/plain, */*",
@@ -67,150 +66,55 @@ const gm_xhr = function () {
     return response.responseText;
   });
 };
-gm_xhr()
-  .then((res) => {
-    console.log(JSON.parse(res));
-    throw '123'
-  })
-  .catch((e) => {
-    console.log(e);
-    alert('出错了')
-  });
-
-
-// 初始化cookie
-// 初始化window.__INITIAL_STATE__.common.CONFIG.secretCode
-// 选择语言功能
-// 出错重定向到搜狗
-// 显示可翻译的语言，可设置
-// 监听ctrl+space快捷键，将选中文本替换为翻译后的文本
-
-// 支持的语言翻译选项
-const all = [
-  {
-    lang: "ar",
-    text: "阿拉伯语",
-    play: !0,
-    abbr: "阿",
-  },
-  {
-    lang: "pl",
-    text: "波兰语",
-    play: !0,
-    abbr: "波兰",
-  },
-  {
-    lang: "da",
-    text: "丹麦语",
-    play: !0,
-    abbr: "丹麦",
-  },
-  {
-    lang: "de",
-    text: "德语",
-    play: !0,
-    abbr: "德",
-  },
-  {
-    lang: "ru",
-    text: "俄语",
-    play: !0,
-    abbr: "俄",
-  },
-  {
-    lang: "fr",
-    text: "法语",
-    play: !0,
-    abbr: "法",
-  },
-  {
-    lang: "fi",
-    text: "芬兰语",
-    play: !0,
-    abbr: "芬",
-  },
-  {
-    lang: "ko",
-    text: "韩语",
-    play: !0,
-    abbr: "韩",
-  },
-  {
-    lang: "nl",
-    text: "荷兰语",
-    play: !0,
-    abbr: "荷",
-  },
-  {
-    lang: "cs",
-    text: "捷克语",
-    play: !0,
-    abbr: "捷克",
-  },
-  {
-    lang: "pt",
-    text: "葡萄牙语",
-    play: !0,
-    abbr: "葡",
-  },
-  {
-    lang: "ja",
-    text: "日语",
-    play: !0,
-    abbr: "日",
-  },
-  {
-    lang: "sv",
-    text: "瑞典语",
-    play: !0,
-    abbr: "瑞典",
-  },
-  {
-    lang: "th",
-    text: "泰语",
-    play: !0,
-    abbr: "泰",
-  },
-  {
-    lang: "tr",
-    text: "土耳其语",
-    play: !1,
-    abbr: "土",
-  },
-  {
-    lang: "es",
-    text: "西班牙语",
-    play: !0,
-    abbr: "西",
-  },
-  {
-    lang: "hu",
-    text: "匈牙利语",
-    play: !0,
-    abbr: "匈",
-  },
-  {
-    lang: "en",
-    text: "英语",
-    play: !0,
-    abbr: "英",
-  },
-  {
-    lang: "it",
-    text: "意大利语",
-    play: !0,
-    abbr: "意",
-  },
-  {
-    lang: "vi",
-    text: "越南语",
-    play: !0,
-    abbr: "越",
-  },
-  {
-    lang: "zh-CHS",
-    text: "中文",
-    play: !0,
-    abbr: "中",
-  },
-];
+// 监听是否替换翻译文本
+document.addEventListener("keydown", (event) => {
+  if (event.shiftKey) {
+    const activeElement = document.activeElement;
+    if (
+      activeElement.tagName === "INPUT" ||
+      activeElement.tagName === "TEXTAREA" ||
+      activeElement.isContentEditable
+    ) {
+      const selectedText = window.getSelection().toString().trim();
+      if (selectedText) {
+        // 初始语言类型，可以是auto
+        const from = "auto";
+        // 目标语言类型
+        const to = GM_getValue("selectedLang", "zh-CHS");
+        // 初始语言内容
+        const text = selectedText;
+        const keyS = SparkMD5.hash(
+          "".concat(from).concat(to).concat(text).concat(secretCode)
+        );
+        const uuid = uuidGen();
+        const data = {
+          client: "pc",
+          exchange: false,
+          fr: "browser_pc",
+          from,
+          needQc: 1,
+          s: keyS,
+          text,
+          to: GM_getValue("selectedLang", "zh-CHS"),
+          uuid: uuid,
+        };
+        gm_xhr(data)
+          .then((res) => {
+            if (
+              activeElement.tagName === "INPUT" ||
+              activeElement.tagName === "TEXTAREA"
+            ) {
+              activeElement.value = JSON.parse(res).data.translate.dit || "";
+            } else if (activeElement.isContentEditable) {
+              activeElement.innerText = JSON.parse(res).data.translate.dit || "";
+            }
+          })
+          .catch((e) => {
+            console.log(e);
+            alert("出错了");
+            // location.href
+          });
+      }
+    }
+  }
+});
