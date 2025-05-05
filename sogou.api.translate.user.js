@@ -3,8 +3,11 @@
 // @namespace   vurses
 // @license     Mit
 // @author      layenh
-// @match       http://127.0.0.1:5500/test.html
+// @match       https://web.telegram.org/*
+// @match       https://webk.telegram.org/*
+// @match       https://webz.telegram.org/*
 // @match       https://fanyi.sogou.com/*
+// @match       *://*/*
 // @grant       GM.xmlhttpRequest
 // @grant       GM_xmlhttpRequest
 // @grant       GM.getValue
@@ -12,8 +15,11 @@
 // @grant       GM.setValue
 // @grant       GM_setValue
 // @connect     fanyi.sogou.com
+// @run-at      document-end
 // @version     1.0
+// @noframes
 // @require     https://update.greasyfork.org/scripts/533087/1572495/WbiSign.js
+// @require     https://update.greasyfork.org/scripts/534967/1583188/langSwitcher.js
 // @description 翻译选中的文本并替换
 // ==/UserScript==
 
@@ -29,8 +35,8 @@ if (location.href.includes("fanyi.sogou.com")) {
   });
 }
 // 注入语言菜单
-unsafeWindow.addEventListener("load", () => {
-  document.body.appendChild(createLangSwitcher(GM_setValue, GM_getValue));
+window.addEventListener("load", () => {
+  document.documentElement.appendChild(createLangSwitcher(GM_setValue, GM_getValue));
 });
 // uuid生成
 function uuidGen() {
@@ -57,8 +63,7 @@ const gm_xhr = function (data) {
         "Content-Type": "application/json",
         Accept: "application/json, text/plain, */*",
       },
-      cookie:
-        "ABTEST=8|1746324514|v17; SNUID=EF0CFA53585E6C128402DD9058D57EE7; SUID=B854A20B2450A20B000000006816CC22; wuid=1746324514576; FQV=5162ae4f50a3c534b8d17802ce056e24; translate.sess=36ca2419-c79a-424d-9654-ec4743137737; SUV=1746324513381; SGINPUT_UPSCREEN=1746324513403",
+      cookie: sogouCookie,
       onload: resolve,
       onerror: reject,
     });
@@ -70,12 +75,14 @@ const gm_xhr = function (data) {
 document.addEventListener("keydown", (event) => {
   if (event.shiftKey) {
     const activeElement = document.activeElement;
+    console.log(activeElement)
     if (
       activeElement.tagName === "INPUT" ||
       activeElement.tagName === "TEXTAREA" ||
       activeElement.isContentEditable
     ) {
       const selectedText = window.getSelection().toString().trim();
+      console.log(selectedText)
       if (selectedText) {
         // 初始语言类型，可以是auto
         const from = "auto";
@@ -100,19 +107,40 @@ document.addEventListener("keydown", (event) => {
         };
         gm_xhr(data)
           .then((res) => {
+            const translatedText = JSON.parse(res).data.translate.dit || "";
+            if (translatedText === "") throw "api 错误";
             if (
               activeElement.tagName === "INPUT" ||
               activeElement.tagName === "TEXTAREA"
             ) {
-              activeElement.value = JSON.parse(res).data.translate.dit || "";
+              const start = activeElement.selectionStart;
+              const end = activeElement.selectionEnd;
+              const originalValue = activeElement.value;
+              activeElement.value =
+                originalValue.slice(0, start) +
+                translatedText +
+                originalValue.slice(end);
+              // 可选：重新设置光标位置
+              activeElement.selectionStart = activeElement.selectionEnd =
+                start + translatedText.length;
+              // ✅ 触发 input 事件（使得 Vue/React 等响应变化）
+              const event = new Event("input", { bubbles: true });
+              activeElement.dispatchEvent(event);
             } else if (activeElement.isContentEditable) {
-              activeElement.innerText = JSON.parse(res).data.translate.dit || "";
+              const selection = window.getSelection();
+              if (!selection.rangeCount) return;
+              const range = selection.getRangeAt(0);
+              range.deleteContents();
+              range.insertNode(document.createTextNode(translatedText));
+              // 可选：移动光标到插入后的位置
+              range.collapse(false);
+              selection.removeAllRanges();
+              selection.addRange(range);
             }
           })
           .catch((e) => {
             console.log(e);
-            alert("出错了");
-            // location.href
+            location.href = "https://fanyi.sogou.com";
           });
       }
     }

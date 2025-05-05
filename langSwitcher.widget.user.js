@@ -8,8 +8,8 @@ function createLangSwitcher(setValue, getValue) {
       /* 容器定位 */
       .language-switcher {
         position: fixed;
-        top: 20px;
-        right: 20px;
+        top: 80px;
+        right: 1px;
         z-index: 1000;
       }
 
